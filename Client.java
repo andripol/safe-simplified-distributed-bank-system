@@ -7,7 +7,8 @@ import java.util.*;
 
 class ClientRun implements Runnable {
 
-    final private int cId1, action, amount, cId2;
+    final private int cId1, amount, cId2;
+    final private  char action;
 
     ClientRun(int cId1, char action, int amount, int cId2) {
         this.cId1 = cId1;
@@ -33,8 +34,7 @@ class ClientRun implements Runnable {
 
         try {
             sId = rand.nextInt(3) + 1; //we have 3 server daemons
-            //sId = 3;
-            System.out.println("\nServed by server:" + sId + "\n");
+            System.out.println("\nWill be served by server:" + sId + "\n");
             cSocket = new Socket("localhost", 4000 + sId);
 
             switch (action) {
@@ -71,7 +71,7 @@ class ClientRun implements Runnable {
             cSocket.close();
 
         } catch (Exception e) {
-            e.printStackTrace();
+            new Thread(new ClientRun(cId1, action, amount, cId2 )).start();
         }
     }
 }

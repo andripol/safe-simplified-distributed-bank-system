@@ -22,9 +22,8 @@ class MultiServerToClientDaemon1 implements Runnable{
             while(true){
                 System.out.println("Waiting for a new client request...");
                 cSocket = sSocket.accept();
-                System.out.println("New client connection established");
                 //create MultiServerThread1 to serve client request
-                new Thread(new MultiServerToClientThread1(cSocket)).start();
+                new Thread(new MultiServerToClientThread1(cSocket, "read_from_socket")).start();
 
             }
         }
@@ -56,7 +55,6 @@ class MultiServerToServerDaemon1 implements Runnable{
             while(true){
                 System.out.println("Waiting for a new server request...");
                 cSocket = sSocket.accept();
-                System.out.println("New server connection established");
                 //create MultiServerThread1 to serve other server's request
                 new Thread(new MultiServerToServerThread1(cSocket)).start();
             }
@@ -76,15 +74,17 @@ public class MultiServer1 {
     protected static Map<Integer, Integer> accounts = new HashMap<>();
 
     protected static int[] servers_ports = {8002, 8003};
+    protected static int[] servers_availability = {1, 1};
+
+    protected static final int serverId = 1;
 
     public static void main(String[] args){
 
-        final int server1Id = 1;
         try {
-            ServerSocket server_client_socket = new ServerSocket(4000 + server1Id);
+            ServerSocket server_client_socket = new ServerSocket(4000 + serverId);
             new Thread(new MultiServerToClientDaemon1(server_client_socket)).start();
 
-            ServerSocket server_server_socket = new ServerSocket(8000 + server1Id );
+            ServerSocket server_server_socket = new ServerSocket(8000 + serverId );
             new Thread(new MultiServerToServerDaemon1(server_server_socket)).start();
 
         }

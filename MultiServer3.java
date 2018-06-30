@@ -24,7 +24,7 @@ class MultiServerToClientDaemon3 implements Runnable{
                 cSocket = sSocket.accept();
                 System.out.println("New client connection established");
                 //create MultiServerThread1 to serve client request
-                new Thread(new MultiServerToClientThread3(cSocket)).start();
+                new Thread(new MultiServerToClientThread3(cSocket, "read_from_socket")).start();
 
             }
         }
@@ -76,15 +76,17 @@ public class MultiServer3 {
     protected static Map<Integer, Integer> accounts = new HashMap<>();
 
     protected static int[] servers_ports = {8001, 8002};
+    protected static int[] servers_availability = {1, 1};
+
+    protected static final int serverId = 3;
 
     public static void main(String[] args){
 
-        final int server1Id = 3;
         try {
-            ServerSocket server_client_socket = new ServerSocket(4000 + server1Id);
+            ServerSocket server_client_socket = new ServerSocket(4000 + serverId);
             new Thread(new MultiServerToClientDaemon3(server_client_socket)).start();
 
-            ServerSocket server_server_socket = new ServerSocket(8000 + server1Id );
+            ServerSocket server_server_socket = new ServerSocket(8000 + serverId );
             new Thread(new MultiServerToServerDaemon3(server_server_socket)).start();
 
         }
