@@ -12,7 +12,6 @@ public class MultiServerToClientThread1 extends MultiServer1 implements Runnable
     final private String failure_message = "failed to connect to server";
     private String request;
 
-
     MultiServerToClientThread1(Socket cSocket, String request) {
         this.cSocket = cSocket;
         this.request = request;
@@ -20,7 +19,7 @@ public class MultiServerToClientThread1 extends MultiServer1 implements Runnable
 
     public void run() {
 
-        System.out.println("[Thread:" +  Thread.currentThread().getId() + "]New client connection established");
+        //System.out.println("[Thread:" +  Thread.currentThread().getId() + "]New client connection established");
 
         Scanner sockReader;
         PrintWriter sockWriter;
@@ -42,7 +41,7 @@ public class MultiServerToClientThread1 extends MultiServer1 implements Runnable
                 request = sockReader.nextLine();
             }
 
-            System.out.println("[Thread:" +  Thread.currentThread().getId() + "]Server 1 " + ", Client Request: " + request);
+            //System.out.println("[Thread:" +  Thread.currentThread().getId() + "]Server 1 " + ", Client Request: " + request);
             request_parts = request.split(",");
 
             action = request_parts[0].charAt(0);
@@ -59,55 +58,109 @@ public class MultiServerToClientThread1 extends MultiServer1 implements Runnable
             String response;
 
             //dummy initialization
-            nBalance1 = -50;
+            nBalance1 = -52;
 
             switch (action) {
                 case '+':
-                    synchronized (account_lock.get(cId1)) {
+                    synchronized (account_lock.get(cId1)) { oBalance1 = accounts.get(cId1);}
 
-                        oBalance1 = accounts.get(cId1);
+                    if (servers_availability[0] == 1){
+                        //send message and receive response
+                        response = send_to_server_and_get_response(next_server_to_send,request + ",2");
 
-                        if (servers_availability[0] == 1){
-                            //send message and receive response
-                            response = send_to_server_and_get_response(next_server_to_send,request + ",2");
+                        if (response.equals(failure_message)){
+                            servers_availability[0] = 0;
+                            //send new client request to ServerToClient daemon with the current cSocket, and "terminate"
+                            end_without_signs = true;
 
-                            if (response.equals(failure_message)){
-                                servers_availability[0] = 0;
-                                //send new client request to ServerToClient daemon with the current cSocket, and "terminate"
-                                end_without_signs = true;
-                                new Thread(new MultiServerToClientThread1(cSocket, request)).start();
-                                break;
-                            }
-
-                            nBalance1 = oBalance1 + amount;
-                            accounts.put(cId1, nBalance1);
-                            System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + (nBalance1 - amount) + " -> " + nBalance1);
-
+                            /////@TODO:seems wrong, debug it
+                            new Thread(new MultiServerToClientThread2(cSocket, request)).start();
+                            break;
                         }
-                        else if(servers_availability[1] == 1){
-                            //send message and receive response. Forwarding is 1 since only one more server is up (possibly)
-                            next_server_to_send = 1;
-                            response = send_to_server_and_get_response(next_server_to_send, request + ",1");
 
-                            if (response.equals(failure_message))
-                                servers_availability[1] = 0;
+                        nBalance1 = oBalance1 + amount;
+                        synchronized (account_lock.get(cId1)) { accounts.put(cId1, nBalance1); }
 
-                            //update yourself and leave
-                            nBalance1 = oBalance1 + amount;
-                            accounts.put(cId1, nBalance1);
-                            System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
-                        }
+                        //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + (nBalance1 - amount) + " -> " + nBalance1);
+
                     }
+                    else if(servers_availability[1] == 1){
+                        //send message and receive response. Forwarding is 1 since only one more server is up (possibly)
+                        next_server_to_send = 1;
+                        response = send_to_server_and_get_response(next_server_to_send, request + ",1");
+
+                        if (response.equals(failure_message))
+                            servers_availability[1] = 0;
+
+                        //update yourself and leave
+                        nBalance1 = oBalance1 + amount;
+                        accounts.put(cId1, nBalance1);
+                        //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
+                    }
+
                     break;
 
                 case '-':
-                    synchronized (account_lock.get(cId1)) {
+                    synchronized (account_lock.get(cId1)) {oBalance1 = accounts.get(cId1);}
+                    nBalance1 = oBalance1;
+                    //first check the validity of the transaction yourself
+                    if ((oBalance1 - amount) < 0){
+                        //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount.");
+                        break;
+                    }
 
-                        oBalance1 = accounts.get(cId1);
+                    if (servers_availability[0] == 1){
+                        //send message and receive response
+                        response = send_to_server_and_get_response(next_server_to_send, request + ",2");
+
+                        if (response.equals(failure_message)){
+                            servers_availability[0] = 0;
+                            //send new client request to ServerToClient daemon with the current cSocket, and "terminate"
+                            end_without_signs = true;
+                            new Thread(new MultiServerToClientThread1(cSocket, request)).start();
+                            break;
+                        }
+
+                        else if (response.equals("true")){
+                            nBalance1 = oBalance1 - amount;
+                            synchronized (account_lock.get(cId1)) { accounts.put(cId1, nBalance1); }
+                            //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
+                        }
+                    }
+                    else if(servers_availability[1] == 1){
+                        //send message and receive response. Forwarding is 1 since only one more server is up (possibly)
+                        next_server_to_send = 1;
+                        response = send_to_server_and_get_response(next_server_to_send , request + ",1");
+
+                        if (response.equals("false")){
+                            //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount.");
+                            break;
+                        }
+                        else if (response.equals(failure_message))
+                            servers_availability[1] = 0;
+
+                        //update yourself and leave
+                        nBalance1 = oBalance1 - amount;
+                        synchronized (account_lock.get(cId1)) { accounts.put(cId1, nBalance1); }
+                        //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
+                    }
+
+
+                    break;
+
+                case '>':
+
+                    if (!accounts.containsKey(cId2)){
+                        accounts.put(cId2, 0);
+                        account_lock.put(cId2, new Object());
+                    }
+
+                    if (cId1 > cId2) {
+                        synchronized (account_lock.get(cId1)) {oBalance1 = accounts.get(cId1);}
                         nBalance1 = oBalance1;
                         //first check the validity of the transaction yourself
-                        if ((oBalance1 - amount) < 0){
-                            System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount.");
+                        if (((oBalance1 - amount) < 0) || (cId1 == cId2)){
+                            //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount or Client Id.");
                             break;
                         }
 
@@ -125,143 +178,98 @@ public class MultiServerToClientThread1 extends MultiServer1 implements Runnable
 
                             else if (response.equals("true")){
                                 nBalance1 = oBalance1 - amount;
-                                accounts.put(cId1, nBalance1);
-                                System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
+                                synchronized (account_lock.get(cId1)) {
+                                    synchronized (account_lock.get(cId2)) {
+                                        accounts.put(cId1, nBalance1);
+                                        nBalance2 = accounts.get(cId2) + amount;
+                                        accounts.put(cId2, nBalance2);
+                                    }
+                                }
+                                //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
                             }
                         }
                         else if(servers_availability[1] == 1){
                             //send message and receive response. Forwarding is 1 since only one more server is up (possibly)
                             next_server_to_send = 1;
-                            response = send_to_server_and_get_response(next_server_to_send , request + ",1");
+                            response = send_to_server_and_get_response(next_server_to_send, request + ",1");
 
                             if (response.equals("false")){
-                                System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount.");
+                                //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount.");
                                 break;
                             }
                             else if (response.equals(failure_message))
                                 servers_availability[1] = 0;
 
                             //update yourself and leave
-                            nBalance1 = oBalance1 + amount;
-                            accounts.put(cId1, nBalance1);
-                            System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
-                        }
-                    }
-
-                    break;
-
-                case '>':
-
-                    if (!accounts.containsKey(cId2)){
-                        accounts.put(cId2, 0);
-                        account_lock.put(cId2, new Object());
-                    }
-
-                    if (cId1 > cId2) {
-                        synchronized (account_lock.get(cId1)){
-                            synchronized (account_lock.get(cId2)) {
-                                oBalance1 = accounts.get(cId1);
-                                nBalance1 = oBalance1;
-                                //first check the validity of the transaction yourself
-                                if (((oBalance1 - amount) < 0) || (cId1 == cId2)){
-                                    System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount or Client Id.");
-                                    break;
-                                }
-
-                                if (servers_availability[0] == 1){
-                                    //send message and receive response
-                                    response = send_to_server_and_get_response(next_server_to_send, request + ",2");
-
-                                    if (response.equals(failure_message)){
-                                        servers_availability[0] = 0;
-                                        //send new client request to ServerToClient daemon with the current cSocket, and "terminate"
-                                        end_without_signs = true;
-                                        new Thread(new MultiServerToClientThread1(cSocket, request)).start();
-                                        break;
-                                    }
-
-                                    else if (response.equals("true")){
-                                        nBalance1 = oBalance1 - amount;
-                                        accounts.put(cId1, nBalance1);
-                                        nBalance2 = accounts.get(cId2) + amount;
-                                        accounts.put(cId2, nBalance2);
-                                        System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
-                                    }
-                                }
-                                else if(servers_availability[1] == 1){
-                                    //send message and receive response. Forwarding is 1 since only one more server is up (possibly)
-                                    next_server_to_send = 1;
-                                    response = send_to_server_and_get_response(next_server_to_send, request + ",1");
-
-                                    if (response.equals("false")){
-                                        System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount.");
-                                        break;
-                                    }
-                                    else if (response.equals(failure_message))
-                                        servers_availability[1] = 0;
-
-                                    //update yourself and leave
-                                    nBalance1 = oBalance1 - amount;
+                            nBalance1 = oBalance1 - amount;
+                            synchronized (account_lock.get(cId1)) {
+                                synchronized (account_lock.get(cId2)) {
                                     accounts.put(cId1, nBalance1);
                                     nBalance2 = accounts.get(cId2) + amount;
                                     accounts.put(cId2, nBalance2);
-                                    System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
                                 }
-
                             }
+                            //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
                         }
+
+
+
                     }
                     else {
-                        synchronized (account_lock.get(cId2)){
-                            synchronized (account_lock.get(cId1)) {
-                                oBalance1 = accounts.get(cId1);
-                                nBalance1 = oBalance1;
-                                //first check the validity of the transaction yourself
-                                if (((oBalance1 - amount) < 0) || (cId1 == cId2)){
-                                    System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount or Client Id.");
-                                    break;
-                                }
+                        synchronized (account_lock.get(cId1)) {oBalance1 = accounts.get(cId1);}
+                        nBalance1 = oBalance1;
+                        //first check the validity of the transaction yourself
+                        if (((oBalance1 - amount) < 0) || (cId1 == cId2)){
+                            //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount or Client Id.");
+                            break;
+                        }
 
-                                if (servers_availability[0] == 1){
-                                    //send message and receive response
-                                    response = send_to_server_and_get_response(next_server_to_send, request + ",2");
+                        if (servers_availability[0] == 1){
+                            //send message and receive response
+                            response = send_to_server_and_get_response(next_server_to_send, request + ",2");
 
-                                    if (response.equals(failure_message)){
-                                        servers_availability[0] = 0;
-                                        //send new client request to ServerToClient daemon with the current cSocket, and "terminate"
-                                        end_without_signs = true;
-                                        new Thread(new MultiServerToClientThread1(cSocket, request)).start();
-                                        break;
-                                    }
+                            if (response.equals(failure_message)){
+                                servers_availability[0] = 0;
+                                //send new client request to ServerToClient daemon with the current cSocket, and "terminate"
+                                end_without_signs = true;
+                                new Thread(new MultiServerToClientThread1(cSocket, request)).start();
+                                break;
+                            }
 
-                                    else if (response.equals("true")){
-                                        nBalance1 = oBalance1 - amount;
+                            else if (response.equals("true")){
+                                nBalance1 = oBalance1 - amount;
+                                synchronized (account_lock.get(cId2)) {
+                                    synchronized (account_lock.get(cId1)) {
                                         accounts.put(cId1, nBalance1);
                                         nBalance2 = accounts.get(cId2) + amount;
                                         accounts.put(cId2, nBalance2);
-                                        System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
                                     }
                                 }
-                                else if(servers_availability[1] == 1){
-                                    //send message and receive response. Forwarding is 1 since only one more server is up (possibly)
-                                    next_server_to_send = 1;
-                                    response = send_to_server_and_get_response(next_server_to_send, request + ",1");
+                                //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
+                            }
+                        }
+                        else if(servers_availability[1] == 1){
+                            //send message and receive response. Forwarding is 1 since only one more server is up (possibly)
+                            next_server_to_send = 1;
+                            response = send_to_server_and_get_response(next_server_to_send, request + ",1");
 
-                                    if (response.equals("false")){
-                                        System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount.");
-                                        break;
-                                    }
-                                    else if (response.equals(failure_message))
-                                        servers_availability[1] = 0;
+                            if (response.equals("false")){
+                                //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Client" + cId1 + " aborted. Invalid amount.");
+                                break;
+                            }
+                            else if (response.equals(failure_message))
+                                servers_availability[1] = 0;
 
-                                    //update yourself and leave
-                                    nBalance1 = oBalance1 - amount;
+                            //update yourself and leave
+                            nBalance1 = oBalance1 - amount;
+                            synchronized (account_lock.get(cId2)) {
+                                synchronized (account_lock.get(cId1)) {
                                     accounts.put(cId1, nBalance1);
                                     nBalance2 = accounts.get(cId2) + amount;
                                     accounts.put(cId2, nBalance2);
-                                    System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
                                 }
                             }
+                            //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + oBalance1 + " -> " + nBalance1);
                         }
                     }
                     break;

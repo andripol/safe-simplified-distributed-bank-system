@@ -26,7 +26,7 @@ class ClientRun implements Runnable {
         PrintWriter sockWriter;
         Scanner sockReader;
 
-        String request; /* request = "Action,Client1,Amount,Client2"; */
+        String request; /* server to server request = "Action,Client1,Amount,Client2, forwarding_value"; */
 
         int sId;
         String response;
@@ -62,15 +62,15 @@ class ClientRun implements Runnable {
             sockWriter.println(request);
             sockWriter.flush();
 
-            //wait for the server to response before running the next request
+            //wait for the server to response before exiting
             sockReader = new Scanner(cSocket.getInputStream());
             response = sockReader.nextLine();
-            //System.out.println("Your balance is equal to: " + response);
             System.out.println(response);
 
             cSocket.close();
 
         } catch (Exception e) {
+            //try with another server
             new Thread(new ClientRun(cId1, action, amount, cId2 )).start();
         }
     }
@@ -82,6 +82,15 @@ public class Client {
 
         int cId1, cId2, amount;
         char action;
+
+        /*
+        MultiServer1.print_map();
+        System.out.println();
+        MultiServer2.print_map();
+        System.out.println();
+        MultiServer3.print_map();
+        System.out.println();
+        */
 
         Scanner in = new Scanner(System.in);
         System.out.printf("Enter Client Id:  ");

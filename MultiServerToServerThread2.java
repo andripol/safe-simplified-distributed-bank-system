@@ -17,7 +17,11 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
 
     public void run() {
 
-        System.out.println("[Thread:" +  Thread.currentThread().getId() + "]New server connection established");
+        System.out.println("HashMap of server 3: ");
+        //System.out.println(accounts.size());
+        System.out.println(Arrays.asList(accounts));
+
+        //System.out.println("[Thread:" +  Thread.currentThread().getId() + "]New server connection established");
 
         Scanner sockReader;
         PrintWriter sockWriter;
@@ -33,7 +37,7 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
 
             sockReader = new Scanner(cSocket.getInputStream());
             request = sockReader.nextLine();
-            System.out.println("[Thread:" +  Thread.currentThread().getId() + "]Server3 response to Server2 request: " + request);
+            //System.out.println("[Thread:" +  Thread.currentThread().getId() + "]Server1 to Server3 request: " + request);
             request_parts = request.split(",");
 
             action = request_parts[0].charAt(0);
@@ -43,7 +47,7 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
             forwarding = Integer.parseInt(request_parts[4]);
 
             //create account if this is the first request ever
-            if (!accounts.containsKey(cId1)){
+            if ((cId1 >= 0) && !accounts.containsKey(cId1)){
                 accounts.put(cId1, 0);
                 account_lock.put(cId1, new Object());
             }
@@ -55,43 +59,92 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
 
             switch (action) {
                 case '+':
-                    synchronized (account_lock.get(cId1)){
-
+                    synchronized (account_lock.get(cId1)) {
                         oBalance1 = accounts.get(cId1);
-
                         //update yourself
                         accounts.put(cId1, oBalance1 + amount);
-
-                        if (forwarding == 1)
-                            break;
-
-                        //update other servers as well if forwarding = 2
-                        if (servers_availability[0] == 1){
-                            //wait for response... indicates if the other server updated its map
-                            response = forward_to_server_and_get_response(request_parts, forwarding);
-                            System.out.println("Server3 response to Server2 request: " + response);
-
-                            if (response.equals(failure_message))
-                                servers_availability[0] = 0;
-                        }
-
                     }
+
+                    if (forwarding == 1)
+                        break;
+
+                    //update other servers as well if forwarding = 2
+                    if (servers_availability[0] == 1){
+                        //wait for response... indicates if the other server updated its map
+                        response = forward_to_server_and_get_response(request_parts, forwarding);
+                        //System.out.println("Server1 response to Server 3 request: " + response);
+
+                        if (response.equals(failure_message))
+                            servers_availability[0] = 0;
+                    }
+
                     break;
 
                 case '-':
                     synchronized (account_lock.get(cId1)){
-
                         oBalance1 = accounts.get(cId1);
+                    }
+
+                    //first check the validity of the transaction yourself
+                    if ((oBalance1 - amount) < 0){
+                        //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Server2 aborted.");
+                        final_response = "false";
+                        break;
+                    }
+
+                    if (forwarding == 1){
+                        synchronized (account_lock.get(cId1)){
+                            accounts.put(cId1, oBalance1 - amount);
+                        }
+                        break;
+                    }
+
+                    //update other servers as well if forwarding = 2
+                    if (servers_availability[0] == 1){
+                        //wait for response... indicates if the other server updated its map
+                        response = forward_to_server_and_get_response(request_parts, forwarding);
+                        //System.out.println("Server1 response to Server3 request: " + response);
+
+                        if (response.equals("false")) {
+                            final_response = "false";
+                            break;
+                        }
+                        else if (response.equals(failure_message))
+                            servers_availability[0] = 0;
+                    }
+
+                    //successor server responsed with "true" or is down. update yourself and leave
+                    synchronized (account_lock.get(cId1)){
+                        accounts.put(cId1, oBalance1 - amount);
+                    }
+
+                    break;
+
+                case '>':
+                    if (!accounts.containsKey(cId2)){
+                        accounts.put(cId2, 0);
+                        account_lock.put(cId2, new Object());
+                    }
+                    if (cId1 > cId2) {
+                        synchronized (account_lock.get(cId1)) {
+                            synchronized (account_lock.get(cId2)) {
+                                oBalance1 = accounts.get(cId1);
+                            }
+                        }
 
                         //first check the validity of the transaction yourself
                         if ((oBalance1 - amount) < 0){
-                            System.out.println("[Thread" +  Thread.currentThread().getId() + "] Transaction request by Server3 aborted.");
                             final_response = "false";
                             break;
                         }
 
                         if (forwarding == 1){
-                            accounts.put(cId1, oBalance1 - amount);
+                            synchronized (account_lock.get(cId1)) {
+                                synchronized (account_lock.get(cId2)) {
+                                    accounts.put(cId1, oBalance1 - amount);
+                                    accounts.put(cId2, accounts.get(cId2) + amount);
+                                }
+                            }
                             break;
                         }
 
@@ -99,7 +152,7 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
                         if (servers_availability[0] == 1){
                             //wait for response... indicates if the other server updated its map
                             response = forward_to_server_and_get_response(request_parts, forwarding);
-                            System.out.println("Server3 response to Server2 request: " + response);
+                            //System.out.println("Server1 response to Server3 request: " + response);
 
                             if (response.equals("false")) {
                                 final_response = "false";
@@ -110,96 +163,166 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
                         }
 
                         //successor server responsed with "true" or is down. update yourself and leave
-                        accounts.put(cId1, oBalance1 - amount);
-                    }
-                    break;
-
-                case '>':
-                    if (!accounts.containsKey(cId2)){
-                        accounts.put(cId2, 0);
-                        account_lock.put(cId2, new Object());
-                    }
-                    if (cId1 > cId2) {
-                        synchronized (account_lock.get(cId1)){
+                        synchronized (account_lock.get(cId1)) {
                             synchronized (account_lock.get(cId2)) {
-                                oBalance1 = accounts.get(cId1);
-                                //first check the validity of the transaction yourself
-                                if ((oBalance1 - amount) < 0){
-                                    final_response = "false";
-                                    break;
-                                }
-
-                                if (forwarding == 1){
-                                    accounts.put(cId1, oBalance1 - amount);
-                                    accounts.put(cId2, accounts.get(cId2) + amount);
-                                    break;
-                                }
-
-                                //update other servers as well if forwarding = 2
-                                if (servers_availability[0] == 1){
-                                    //wait for response... indicates if the other server updated its map
-                                    response = forward_to_server_and_get_response(request_parts, forwarding);
-                                    System.out.println("Server3 response to Server2 request: " + response);
-
-                                    if (response.equals("false")) {
-                                        final_response = "false";
-                                        break;
-                                    }
-                                    else if (response.equals(failure_message))
-                                        servers_availability[0] = 0;
-                                }
-
-                                //successor server responsed with "true" or is down. update yourself and leave
                                 accounts.put(cId1, oBalance1 - amount);
                                 accounts.put(cId2, accounts.get(cId2) + amount);
-
                             }
                         }
+
                     }
                     else{
-                        synchronized (account_lock.get(cId2)){
-                            synchronized (account_lock.get(cId1)) {
+                        synchronized (account_lock.get(cId1)) {
+                            synchronized (account_lock.get(cId2)) {
                                 oBalance1 = accounts.get(cId1);
-                                //first check the validity of the transaction yourself
-                                if ((oBalance1 - amount) < 0){
-                                    final_response = "false";
-                                    break;
-                                }
+                            }
+                        }
 
-                                if (forwarding == 1){
+                        //first check the validity of the transaction yourself
+                        if ((oBalance1 - amount) < 0){
+                            final_response = "false";
+                            break;
+                        }
+
+                        if (forwarding == 1){
+                            synchronized (account_lock.get(cId1)) {
+                                synchronized (account_lock.get(cId2)) {
                                     accounts.put(cId1, oBalance1 - amount);
                                     accounts.put(cId2, accounts.get(cId2) + amount);
-                                    break;
                                 }
+                            }
+                            break;
+                        }
 
-                                //update other servers as well if forwarding = 2
-                                if (servers_availability[0] == 1){
-                                    //wait for response... indicates if the other server updated its map
-                                    response = forward_to_server_and_get_response(request_parts, forwarding);
-                                    System.out.println("Server3 response to Server2 request: " + response);
+                        //update other servers as well if forwarding = 2
+                        if (servers_availability[0] == 1){
+                            //wait for response... indicates if the other server updated its map
+                            response = forward_to_server_and_get_response(request_parts, forwarding);
+                            //System.out.println("Server1 response to Server3 request: " + response);
 
-                                    if (response.equals("false")) {
-                                        final_response = "false";
-                                        break;
-                                    }
-                                    else if (response.equals(failure_message))
-                                        servers_availability[0] = 0;
-                                }
+                            if (response.equals("false")) {
+                                final_response = "false";
+                                break;
+                            }
+                            else if (response.equals(failure_message))
+                                servers_availability[0] = 0;
+                        }
 
-                                //successor server responsed with "true" or is down. update yourself and leave
+                        //successor server responsed with "true" or is down. update yourself and leave
+                        synchronized (account_lock.get(cId1)) {
+                            synchronized (account_lock.get(cId2)) {
                                 accounts.put(cId1, oBalance1 - amount);
                                 accounts.put(cId2, accounts.get(cId2) + amount);
                             }
                         }
                     }
                     break;
+                case 'i':
+                    Socket cSocketSS;
+                    PrintWriter sockWriterSS;
+                    Scanner sockReaderSS;
 
+                    //lock the whole account map in order to initialize the asking server
+                    synchronized (account_lock){
+                        if (forwarding == 1){
+                            //say that you locked and wait until initialization is completed
+                            sockWriter = new PrintWriter(cSocket.getOutputStream());
+                            sockWriter.println("locked");
+                            sockWriter.flush();
+                            //System.out.println("Waiting for initialization to be completed...");
+                            response = "false";
+
+                            sockReader = new Scanner(cSocket.getInputStream());
+                            response = sockReader.nextLine();
+
+                            //System.out.println("Initialization completed...");
+                            //server 1 back up
+                            servers_availability[0] = 1;
+                            break;
+                        }
+
+                        //the other server (if up) should lock its map too
+                        if ((servers_availability[0] == 1) && forwarding == 2){
+                            //wait for response... indicates if the other server locked its map
+                            try {
+                                cSocketSS = new Socket("localhost", servers_ports[0]);
+                                sockWriterSS = new PrintWriter(cSocketSS.getOutputStream());
+                                sockWriterSS.println(request_parts[0] + "," + request_parts[1] + "," + request_parts[2] + "," + request_parts[3] + "," + Integer.toString(forwarding - 1));
+                                sockWriterSS.flush();
+                                sockReaderSS = new Scanner(cSocketSS.getInputStream());
+                                //wait for response... indicates that the other server locked its map as well
+                                response = sockReaderSS.nextLine();
+
+                                //send info to server-client
+                                sockReader = new Scanner(cSocket.getInputStream());
+                                sockWriter = new PrintWriter(cSocket.getOutputStream());
+
+                                for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
+                                    sockWriter.println(entry.getKey() + "," + entry.getValue());
+                                    sockWriter.flush();
+                                    //wait for response, be sure he got it
+                                    response = sockReader.nextLine();
+                                }
+                                //inform that it is all sent
+                                sockWriter.println("Done");
+                                sockWriter.flush();
+
+                                //inform the successor server so as to stop locking
+                                sockWriterSS.println("Done");
+                                sockWriterSS.flush();
+                                cSocketSS.close();
+
+                                //server 2 back up
+                                servers_availability[1] = 1;
+                                break;
+                            }
+                            catch (Exception e){
+                                //the successor server is down
+                                servers_availability[0] = 0;
+                                //send info to server-client
+                                sockReader = new Scanner(cSocket.getInputStream());
+                                sockWriter = new PrintWriter(cSocket.getOutputStream());
+
+                                for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
+                                    sockWriter.println(entry.getKey() + "," + entry.getValue());
+                                    sockWriter.flush();
+                                    //wait for response, be sure he got it
+                                    response = sockReader.nextLine();
+                                }
+                                //inform that it is all sent
+                                sockWriter.println("Done");
+                                sockWriter.flush();
+                                //server 2 back up
+                                servers_availability[1] = 1;
+                                break;
+                            }
+                        }
+                        if (forwarding == 0){
+                            for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
+                                sockWriter = new PrintWriter(cSocket.getOutputStream());
+                                sockWriter.println(entry.getKey() + "," + entry.getValue());
+                                sockWriter.flush();
+                                //wait for response, be sure he got it
+                                sockReader = new Scanner(cSocket.getInputStream());
+                                response = sockReader.nextLine();
+                            }
+                            //inform that it is all sent
+                            sockWriter = new PrintWriter(cSocket.getOutputStream());
+                            sockWriter.println("Done");
+                            sockWriter.flush();
+                            //server 1 back up
+                            servers_availability[0] = 1;
+                            break;
+                        }
+                    }
+                    break;
             }
-            sockWriter = new PrintWriter(cSocket.getOutputStream());
-            sockWriter.println(final_response);
-            System.out.println("Server2 response to Server1 request: " + final_response);
-            sockWriter.flush();
-
+            if (action != 'i'){
+                sockWriter = new PrintWriter(cSocket.getOutputStream());
+                sockWriter.println(final_response);
+                //System.out.println("Server3 response to Server2 request: " + final_response);
+                sockWriter.flush();
+            }
         }
         catch(Exception e){
             e.printStackTrace();
@@ -223,7 +346,7 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
             return response;
         }
         catch (Exception e){
-           // e.printStackTrace();
+            e.printStackTrace();
             return(failure_message);
         }
 

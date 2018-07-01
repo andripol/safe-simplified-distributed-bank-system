@@ -16,23 +16,21 @@ class MultiServerToClientDaemon1 implements Runnable{
 
         Socket cSocket;
 
-        System.out.println("Starting Server " + sId);
+        //System.out.println("Starting Server " + sId);
 
         try{
             while(true){
-                System.out.println("Waiting for a new client request...");
+                // System.out.println("Waiting for a new client request...");
                 cSocket = sSocket.accept();
+                System.out.println("New client connection established");
                 //create MultiServerThread1 to serve client request
                 new Thread(new MultiServerToClientThread1(cSocket, "read_from_socket")).start();
-
             }
         }
         catch (Exception e) {
-            System.out.println("Server" + sId + " " + MultiServer1.accounts);
+            //System.out.println("Server" + sId + " " + MultiServer1.accounts);
         }
-
     }
-
 }
 
 class MultiServerToServerDaemon1 implements Runnable{
@@ -51,16 +49,19 @@ class MultiServerToServerDaemon1 implements Runnable{
 
         System.out.println("Starting Server " + sId);
 
+
+
         try{
             while(true){
-                System.out.println("Waiting for a new server request...");
+                //System.out.println("Waiting for a new server request...");
                 cSocket = sSocket.accept();
+                System.out.println("New server connection established");
                 //create MultiServerThread1 to serve other server's request
                 new Thread(new MultiServerToServerThread1(cSocket)).start();
             }
         }
         catch (Exception e) {
-            System.out.println("Server" + sId + " " + MultiServer1.accounts);
+            //System.out.println("Server" + sId + " " + MultiServer1.accounts);
         }
 
     }
@@ -71,7 +72,7 @@ class MultiServerToServerDaemon1 implements Runnable{
 public class MultiServer1 {
 
     protected static Map<Integer, Object> account_lock = new HashMap<>();
-    protected static Map<Integer, Integer> accounts = new HashMap<>();
+    public static Map<Integer, Integer> accounts = new HashMap<>();
 
     protected static int[] servers_ports = {8002, 8003};
     protected static int[] servers_availability = {1, 1};
@@ -79,6 +80,9 @@ public class MultiServer1 {
     protected static final int serverId = 1;
 
     public static void main(String[] args){
+
+        //initialize the accounts of the server
+        new Thread(new InitializeThread1()).start();
 
         try {
             ServerSocket server_client_socket = new ServerSocket(4000 + serverId);
@@ -92,4 +96,13 @@ public class MultiServer1 {
             e.printStackTrace();
         }
     }
+
+    /*
+    public static void print_map(){
+        System.out.println("HashMap of server 1: ");
+        System.out.println(accounts.size());
+        System.out.println(Arrays.asList(accounts));
+    }
+    */
+
 }
