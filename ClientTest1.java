@@ -8,7 +8,7 @@ class ClientRunTest implements Runnable {
 
     public void run() {
 
-        final int requests = 1000;
+        final int requests = 5000;
         final Random rand = new Random();
 
         /* request = "Action,Client1,Amount,Client2"; */

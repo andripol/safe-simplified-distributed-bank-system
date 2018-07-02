@@ -109,12 +109,4 @@ public class MultiServer3 {
         }
     }
 
-    /*
-    public static void print_map(){
-        System.out.println("HashMap of server 1: ");
-        System.out.println(accounts.size());
-        System.out.println(Arrays.asList(accounts));
-    }
-    */
-
 }
