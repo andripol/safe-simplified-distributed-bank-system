@@ -33,8 +33,9 @@ class ClientRun implements Runnable {
         //int balance = 500;
 
         try {
-            sId = rand.nextInt(3) + 1; //we have 3 server daemons
-            System.out.println("\nWill be served by server:" + sId + "\n");
+            //sId = rand.nextInt(3) + 1; //we have 3 server daemons
+            sId = 1; //keep total order
+            //System.out.println("\nWill be served by server:" + sId + "\n");
             cSocket = new Socket("localhost", 4000 + sId);
 
             switch (action) {
