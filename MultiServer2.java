@@ -86,18 +86,25 @@ public class MultiServer2 {
 
     public static void main(String[] args){
 
-        //initialize the accounts of the server
-        new Thread(new InitializeThread2()).start();
+        try{
+            //initialize the accounts of the server
+            Thread initialization_thread = new Thread(new InitializeThread2());
+            initialization_thread.start();
+            initialization_thread.join();
 
-        try {
-            ServerSocket server_client_socket = new ServerSocket(4000 + serverId);
-            new Thread(new MultiServerToClientDaemon2(server_client_socket)).start();
+            try {
+                ServerSocket server_client_socket = new ServerSocket(4000 + serverId);
+                new Thread(new MultiServerToClientDaemon2(server_client_socket)).start();
 
-            ServerSocket server_server_socket = new ServerSocket(8000 + serverId );
-            new Thread(new MultiServerToServerDaemon2(server_server_socket)).start();
+                ServerSocket server_server_socket = new ServerSocket(8000 + serverId );
+                new Thread(new MultiServerToServerDaemon2(server_server_socket)).start();
 
+            }
+            catch(Exception e) {
+                e.printStackTrace();
+            }
         }
-        catch(Exception e) {
+        catch (Exception e){
             e.printStackTrace();
         }
     }

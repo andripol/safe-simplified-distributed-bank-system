@@ -34,9 +34,19 @@ class ClientRun implements Runnable {
 
         try {
             //sId = rand.nextInt(3) + 1; //we have 3 server daemons
+
+
+
             sId = 1; //keep total order
-            //System.out.println("\nWill be served by server:" + sId + "\n");
-            cSocket = new Socket("localhost", 4000 + sId);
+            try{
+                cSocket = new Socket("localhost", 4000 + sId);
+            }
+            catch (Exception e){
+                //if server1 is down, try out server2. If server2 is down too, there is no majority
+                sId++;
+                cSocket = new Socket("localhost", 4000 + sId);
+            }
+            System.out.println("\nWill be served by server:" + sId + "\n");
 
             switch (action) {
                 case '+':
@@ -71,7 +81,8 @@ class ClientRun implements Runnable {
             cSocket.close();
 
         } catch (Exception e) {
-            //try with another server
+            //try again
+            System.out.println("Server crashed. Let's try again..");
             new Thread(new ClientRun(cId1, action, amount, cId2 )).start();
         }
     }

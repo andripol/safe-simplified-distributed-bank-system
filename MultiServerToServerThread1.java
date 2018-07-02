@@ -149,15 +149,6 @@ public class MultiServerToServerThread1 extends MultiServer1 implements  Runnabl
                         }
                     }
                     break;
-                case '?':
-                    synchronized (account_lock.get(cId1)) {
-
-                        //update other servers as well if forwarding = 2
-                        if (forwarding == 2)
-                            response = forward_to_server_and_get_response(request_parts, forwarding);
-
-                    }
-                    break;
 
                 case 'i':
                     Socket cSocketSS;
@@ -281,7 +272,6 @@ public class MultiServerToServerThread1 extends MultiServer1 implements  Runnabl
             return response;
         }
         catch (Exception e){
-            e.printStackTrace();
             return(failure_message);
         }
 

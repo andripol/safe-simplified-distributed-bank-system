@@ -14,7 +14,7 @@ public class InitializeThread3 extends MultiServer3 implements Runnable {
     InitializeThread3(){    }
 
     public void run() {
-        System.out.println("Initialization Thread 1 starting..");
+        System.out.println("Initialization Thread 3 starting..");
         /* server to server request = "Action,Client1,Amount,Client2, forwarding_value"; */
         String response1, response2;
 
@@ -31,7 +31,7 @@ public class InitializeThread3 extends MultiServer3 implements Runnable {
             }
         }
 
-        System.out.println("Initialization Thread 1 exiting..");
+        System.out.println("Initialization Thread 3 exiting..");
     }
 
 

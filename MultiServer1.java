@@ -55,8 +55,6 @@ class MultiServerToServerDaemon1 implements Runnable{
 
         System.out.println("Starting Server " + sId);
 
-
-
         try{
             while(true){
                 //System.out.println("Waiting for a new server request...");

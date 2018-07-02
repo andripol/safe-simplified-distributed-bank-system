@@ -49,12 +49,6 @@ public class MultiServerToClientThread2 extends MultiServer2 implements Runnable
 
             String response, response1, response2 = "false";
 
-            //create account if this is the first request ever
-            if (cId1 >=0 && !accounts.containsKey(cId1)){
-                accounts.put(cId1, 0);
-                account_lock.put(cId1, new Object());
-                account_just_created = cId1;
-            }
 
             //dummy initialization
             nBalance1 = 0;
@@ -62,12 +56,20 @@ public class MultiServerToClientThread2 extends MultiServer2 implements Runnable
             switch (action) {
                 case '+':
 
+                    //create account if this is the first request ever
+                    if (cId1 >=0 && !accounts.containsKey(cId1)){
+                        accounts.put(cId1, 0);
+                        account_lock.put(cId1, new Object());
+                        account_just_created = cId1;
+                    }
+
                     synchronized (account_lock.get(cId1)) {
                         oBalance1 = accounts.get(cId1);
 
                         response1 = send_to_server_and_get_response(next_server_to_send,request + ",2");
 
                         if (response1.equals(failure_message)) {
+                            next_server_to_send++;
                             response2 = send_to_server_and_get_response(next_server_to_send, request + ",1");
                             if (response2.equals(failure_message)) {
                                 is_minority = true;
@@ -102,6 +104,7 @@ public class MultiServerToClientThread2 extends MultiServer2 implements Runnable
                         response1 = send_to_server_and_get_response(next_server_to_send,request + ",2");
 
                         if (response1.equals(failure_message)) {
+                            next_server_to_send++;
                             response2 = send_to_server_and_get_response(next_server_to_send, request + ",1");
                             if (response2.equals(failure_message)) {
                                 is_minority = true;
@@ -120,10 +123,15 @@ public class MultiServerToClientThread2 extends MultiServer2 implements Runnable
                     break;
 
                 case '>':
+                    if (!accounts.containsKey(cId1)){
+                        System.out.println("transaction aborted. No such account.");
+                        break;
+                    }
 
                     if (!accounts.containsKey(cId2)){
                         accounts.put(cId2, 0);
                         account_lock.put(cId2, new Object());
+                        account_just_created = cId2;
                     }
 
                     //avoid deadlock
@@ -142,6 +150,7 @@ public class MultiServerToClientThread2 extends MultiServer2 implements Runnable
                                 response1 = send_to_server_and_get_response(next_server_to_send,request + ",2");
 
                                 if (response1.equals(failure_message)) {
+                                    next_server_to_send++;
                                     response2 = send_to_server_and_get_response(next_server_to_send, request + ",1");
                                     if (response2.equals(failure_message)) {
                                         is_minority = true;
@@ -173,6 +182,7 @@ public class MultiServerToClientThread2 extends MultiServer2 implements Runnable
                                 response1 = send_to_server_and_get_response(next_server_to_send,request + ",2");
 
                                 if (response1.equals(failure_message)) {
+                                    next_server_to_send++;
                                     response2 = send_to_server_and_get_response(next_server_to_send, request + ",1");
                                     if (response2.equals(failure_message)) {
                                         is_minority = true;
@@ -192,24 +202,12 @@ public class MultiServerToClientThread2 extends MultiServer2 implements Runnable
                     }
                     break;
                 case '?':
-                    synchronized (account_lock.get(cId1)) {
-                        oBalance1 = accounts.get(cId1);
-
-                        response1 = send_to_server_and_get_response(next_server_to_send,request + ",2");
-
-                        if (response1.equals(failure_message)) {
-                            response2 = send_to_server_and_get_response(next_server_to_send, request + ",1");
-                            if (response2.equals(failure_message)) {
-                                is_minority = true;
-                                System.out.println("No majority. Request aborted.");
-                                break;
-                            }
-                        }
-
-                        if (response1.equals("true") || response2.equals("true")){
-                            nBalance1 = accounts.get(cId1);
-                        }
-                        //System.out.println("[Thread" +  Thread.currentThread().getId() + "] Client " + cId1 + ", Balance: " + (nBalance1 - amount) + " -> " + nBalance1);
+                    if (!accounts.containsKey(cId1)){
+                        System.out.println("transaction aborted. No such account.");
+                        break;
+                    }
+                    synchronized (account_lock.get(cId1)){
+                        nBalance1 = accounts.get(cId1);
                     }
 
             }
