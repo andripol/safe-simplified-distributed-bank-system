@@ -18,13 +18,16 @@ public class InitializeThread2 extends MultiServer2 implements Runnable {
         /* server to server request = "Action,Client1,Amount,Client2, forwarding_value"; */
         String response1, response2;
 
-        int next_server_to_send = 0;
-        String request = "i,-1,-1,-1";
+        //ATTENTION!keep total order. send request to server1 and then try server3
+        int next_server_to_send = 1;
+        //ALSO: use cId1 position to acknowledge which server you are
+        String request = "i," + serverId + ",-1,-1";
 
         response1 = send_request_and_initialize_map(next_server_to_send,request + ",2");
 
         if (response1.equals(failure_message)) {
-            next_server_to_send = 1;
+            //ATTENTION! Deadlock danger. keep total order. Only if server1 fails try server3
+            next_server_to_send = 0;
             response2 = send_request_and_initialize_map(next_server_to_send, request + ",0");
             if (response2.equals(failure_message)) {
                 System.out.println("No majority. Request aborted.");

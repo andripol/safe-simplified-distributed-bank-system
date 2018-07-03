@@ -35,6 +35,9 @@ public class MultiServerToClientThread1 extends MultiServer1 implements Runnable
             int oBalance1;
             int nBalance1;
 
+            final Random rand = new Random();
+            Thread.sleep(rand.nextInt(10));
+
             sockReader = new Scanner(cSocket.getInputStream());
             request = sockReader.nextLine();
 

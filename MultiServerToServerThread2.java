@@ -5,11 +5,14 @@
 import java.io.*;
 import java.net.*;
 import java.util.*;
+import java.util.Map.Entry;
 
 public class MultiServerToServerThread2 extends MultiServer2 implements  Runnable {
 
     final private Socket cSocket;
     final private String failure_message = "failed to connect to server";
+    Scanner sockReader;
+    PrintWriter sockWriter;
 
     MultiServerToServerThread2(Socket cSocket){
         this.cSocket = cSocket;
@@ -17,8 +20,6 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
 
     public void run() {
 
-        Scanner sockReader;
-        PrintWriter sockWriter;
         String request;
         String[] request_parts;
         String final_response;
@@ -58,7 +59,7 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
 
                         //update other servers as well if forwarding = 2
                         if (forwarding == 2)
-                            response = forward_to_server_and_get_response(request_parts, forwarding);
+                            forward_to_server_and_get_response(request_parts, forwarding-1);
 
                         //already in majority. update yourself
                         accounts.put(cId1, oBalance1 + amount);
@@ -81,7 +82,7 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
                         }
 
                         //update other servers as well if forwarding = 2
-                        response = forward_to_server_and_get_response(request_parts, forwarding);
+                        response = forward_to_server_and_get_response(request_parts, forwarding-1);
 
                         if (response.equals("true"))
                             accounts.put(cId1, oBalance1 - amount);
@@ -113,7 +114,7 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
                                 }
 
                                 //update other servers as well if forwarding = 2
-                                response = forward_to_server_and_get_response(request_parts, forwarding);
+                                response = forward_to_server_and_get_response(request_parts, forwarding-1);
 
                                 if (response.equals("true")){
                                     accounts.put(cId1, oBalance1 - amount);
@@ -139,7 +140,7 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
                                 }
 
                                 //update other servers as well if forwarding = 2
-                                response = forward_to_server_and_get_response(request_parts, forwarding);
+                                response = forward_to_server_and_get_response(request_parts, forwarding-1);
 
                                 if (response.equals("true")){
                                     accounts.put(cId1, oBalance1 - amount);
@@ -151,94 +152,14 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
                     break;
 
                 case 'i':
-                    Socket cSocketSS;
-                    PrintWriter sockWriterSS;
-                    Scanner sockReaderSS;
-
                     Thread.currentThread().setPriority(10);
 
-                    //lock the whole account map in order to initialize the asking server
-                    synchronized (account_lock){
-                        if (forwarding == 1){
-                            //say that you locked and wait until initialization is completed
-                            sockWriter = new PrintWriter(cSocket.getOutputStream());
-                            sockWriter.println("locked");
-                            sockWriter.flush();
-                            //System.out.println("Waiting for initialization to be completed...");
-
-                            sockReader = new Scanner(cSocket.getInputStream());
-                            response = sockReader.nextLine();
-                            //System.out.println("Initialization completed...");
-                            break;
-                        }
-
-                        if (forwarding == 2){
-                            try {
-                                cSocketSS = new Socket("localhost", servers_ports[0]);
-                                sockWriterSS = new PrintWriter(cSocketSS.getOutputStream());
-                                sockWriterSS.println(request_parts[0] + "," + request_parts[1] + "," + request_parts[2] + "," + request_parts[3] + "," + Integer.toString(forwarding - 1));
-                                sockWriterSS.flush();
-                                sockReaderSS = new Scanner(cSocketSS.getInputStream());
-                                //wait for response... means that the other server locked its map as well
-                                response = sockReaderSS.nextLine();
-
-                                //send info to server-client
-                                sockReader = new Scanner(cSocket.getInputStream());
-                                sockWriter = new PrintWriter(cSocket.getOutputStream());
-
-                                for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
-                                    sockWriter.println(entry.getKey() + "," + entry.getValue());
-                                    sockWriter.flush();
-                                    //wait for response, make sure he got it
-                                    response = sockReader.nextLine();
-                                }
-                                //inform that it is all sent
-                                sockWriter.println("Done");
-                                sockWriter.flush();
-
-                                //inform the successor server so as to stop locking
-                                sockWriterSS.println("Done");
-                                sockWriterSS.flush();
-                                cSocketSS.close();
-
-                                break;
-                            }
-                            catch (Exception e){
-                                //send info to server-client
-                                sockReader = new Scanner(cSocket.getInputStream());
-                                sockWriter = new PrintWriter(cSocket.getOutputStream());
-
-                                for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
-                                    sockWriter.println(entry.getKey() + "," + entry.getValue());
-                                    sockWriter.flush();
-                                    //wait for response, be sure he got it
-                                    response = sockReader.nextLine();
-                                }
-                                //inform that it is all sent
-                                sockWriter.println("Done");
-                                sockWriter.flush();
-                                break;
-                            }
-                        }
-
-                        if (forwarding == 0){
-                            for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
-                                sockWriter = new PrintWriter(cSocket.getOutputStream());
-                                sockWriter.println(entry.getKey() + "," + entry.getValue());
-                                sockWriter.flush();
-                                //wait for response, be sure he got it
-                                sockReader = new Scanner(cSocket.getInputStream());
-                                response = sockReader.nextLine();
-                            }
-                            //inform that it is all sent
-                            sockWriter = new PrintWriter(cSocket.getOutputStream());
-                            sockWriter.println("Done");
-                            sockWriter.flush();
-                            break;
-                        }
-                    }
+                    //iterator over the hashmap
+                    Iterator<Entry<Integer, Object>> it = account_lock.entrySet().iterator();
+                    recursive_locking_and_update(it, forwarding, request_parts);
                     break;
             }
+
             if (action != 'i'){
                 sockWriter = new PrintWriter(cSocket.getOutputStream());
                 sockWriter.println(final_response);
@@ -274,7 +195,105 @@ public class MultiServerToServerThread2 extends MultiServer2 implements  Runnabl
         catch (Exception e){
             return(failure_message);
         }
+    }
 
+    private void recursive_locking_and_update(Iterator<Entry<Integer, Object>> it, int forwarding, String[] request_parts){
+        Thread.currentThread().setPriority(10);
+        if (it.hasNext()) {
+            synchronized (account_lock.get(it.next().getKey())){
+                System.out.println("I am here, in recursion!");
+                recursive_locking_and_update(it, forwarding, request_parts);
+            }
+        }
+        else{
+            System.out.println("I have locked everything!");
+            //you got the locks over all the accounts. do your thing
+            Socket cSocketSS;
+            PrintWriter sockWriterSS;
+            Scanner sockReaderSS;
+
+            try{
+                if (forwarding == 1){
+                    //say that you locked and wait until initialization is completed
+                    sockWriter = new PrintWriter(cSocket.getOutputStream());
+                    sockWriter.println("locked");
+                    sockWriter.flush();
+                    //System.out.println("Waiting for initialization to be completed...");
+
+                    sockReader = new Scanner(cSocket.getInputStream());
+                    sockReader.nextLine();
+                    //System.out.println("Initialization completed...");
+                }
+
+                if (forwarding == 2){
+                    try {
+                        cSocketSS = new Socket("localhost", servers_ports[0]);
+                        sockWriterSS = new PrintWriter(cSocketSS.getOutputStream());
+                        sockWriterSS.println(request_parts[0] + "," + request_parts[1] + "," + request_parts[2] + "," + request_parts[3] + "," + Integer.toString(forwarding - 1));
+                        sockWriterSS.flush();
+                        sockReaderSS = new Scanner(cSocketSS.getInputStream());
+                        //wait for response... means that the other server locked its map as well
+                        sockReaderSS.nextLine();
+
+                        //send info to server-client
+                        sockReader = new Scanner(cSocket.getInputStream());
+                        sockWriter = new PrintWriter(cSocket.getOutputStream());
+
+                        for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
+                            sockWriter.println(entry.getKey() + "," + entry.getValue());
+                            sockWriter.flush();
+                            //wait for response, make sure he got it
+                            sockReader.nextLine();
+                        }
+                        //inform that it is all sent
+                        sockWriter.println("Done");
+                        sockWriter.flush();
+
+                        //inform the successor server so as to stop locking
+                        sockWriterSS.println("Done");
+                        sockWriterSS.flush();
+                        cSocketSS.close();
+
+                    }
+                    catch (Exception e){
+                        //send info to server-client
+                        sockReader = new Scanner(cSocket.getInputStream());
+                        sockWriter = new PrintWriter(cSocket.getOutputStream());
+
+                        for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
+                            sockWriter.println(entry.getKey() + "," + entry.getValue());
+                            sockWriter.flush();
+                            //wait for response, be sure he got it
+                            sockReader.nextLine();
+                        }
+                        //inform that it is all sent
+                        sockWriter.println("Done");
+                        sockWriter.flush();
+                    }
+                }
+
+                if (forwarding == 0){
+                    for (Map.Entry<Integer, Integer> entry : accounts.entrySet()) {
+                        sockWriter = new PrintWriter(cSocket.getOutputStream());
+                        sockWriter.println(entry.getKey() + "," + entry.getValue());
+                        sockWriter.flush();
+                        //wait for response, be sure he got it
+                        sockReader = new Scanner(cSocket.getInputStream());
+                        sockReader.nextLine();
+                    }
+                    //inform that it is all sent
+                    sockWriter = new PrintWriter(cSocket.getOutputStream());
+                    sockWriter.println("Done");
+                    sockWriter.flush();
+                }
+                System.out.println("Now I am exiting recursively.. that's style!");
+            }
+            catch(Exception e){
+                e.printStackTrace();
+            }
+
+
+        }
     }
 
 }

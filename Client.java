@@ -46,7 +46,7 @@ class ClientRun implements Runnable {
                 sId++;
                 cSocket = new Socket("localhost", 4000 + sId);
             }
-            System.out.println("\nWill be served by server:" + sId + "\n");
+            //System.out.println("\nWill be served by server:" + sId + "\n");
 
             switch (action) {
                 case '+':
@@ -76,13 +76,13 @@ class ClientRun implements Runnable {
             //wait for the server to response before exiting
             sockReader = new Scanner(cSocket.getInputStream());
             response = sockReader.nextLine();
-            System.out.println(response);
+            //System.out.println(response);
 
             cSocket.close();
 
         } catch (Exception e) {
             //try again
-            System.out.println("Server crashed. Let's try again..");
+            //System.out.println("Server crashed. Let's try again..");
             new Thread(new ClientRun(cId1, action, amount, cId2 )).start();
         }
     }

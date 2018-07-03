@@ -1,5 +1,4 @@
-import java.io.*;
-import java.net.*;
+
 import java.util.*;
 
 class ClientRunTest implements Runnable {
@@ -8,7 +7,7 @@ class ClientRunTest implements Runnable {
 
     public void run() {
 
-        final int requests = 5000;
+        final int requests = 500;
         final Random rand = new Random();
 
         /* request = "Action,Client1,Amount,Client2"; */
