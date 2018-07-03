@@ -20,7 +20,7 @@ public class InitializeThread3 extends MultiServer3 implements Runnable {
 
         int next_server_to_send = 0;
         //ALSO: use cId1 position to acknowledge which server you are
-        String request = "i," + serverId + ",-1,-1";
+        String request = "i," + (-serverId) + ",-1,-1";
 
         response1 = send_request_and_initialize_map(next_server_to_send,request + ",2");
 

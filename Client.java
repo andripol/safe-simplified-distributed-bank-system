@@ -76,7 +76,7 @@ class ClientRun implements Runnable {
             //wait for the server to response before exiting
             sockReader = new Scanner(cSocket.getInputStream());
             response = sockReader.nextLine();
-            //System.out.println(response);
+            System.out.println(response);
 
             cSocket.close();
 

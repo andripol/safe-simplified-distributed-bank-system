@@ -160,8 +160,8 @@ public class MultiServerToServerThread1 extends MultiServer1 implements  Runnabl
 
                     //iterator over the hashmap
                     Iterator<Entry<Integer, Object>> it = account_lock.entrySet().iterator();
-                    int server2 = 2;
-                    int server3 = 3;
+                    //int server2 = -2;
+                    int server3 = -3;
                     if (cId1 == server3){
                         recursive_locking_and_update(it, forwarding, request_parts, 0);
                     }
